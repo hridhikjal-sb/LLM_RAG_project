@@ -102,18 +102,25 @@ elif file_type == "url":
         docs = load_documents(folder_path)
         st.success(f"Scraped and loaded {len(docs)} documents.")
         
+if os.path.exists('.chroma_db'):
+    try:
+        shutil.rmtree('.chroma_db')
+        print("chromdb deleted")
+    except Exception as e:
+        print(f"Could not delete .chroma_db: {e}")
 
 # Proceed if documents are loaded
 if 'docs' in locals():
     splits = text_splitter.split_documents(docs)
-    if os.path.exists(".chroma_db"):
-        shutil.rmtree(".chroma_db")
+
     vectorstore = Chroma.from_documents(
         collection_name='my_collection',
         documents=splits,
         embedding=embedding_function,
         persist_directory='.chroma_db'
     )
+
+    st.success("chromdb create for url")
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
@@ -155,6 +162,7 @@ if 'docs' in locals():
     user_question = st.text_input("Ask your question:")
     if st.button("Submit") and user_question:
         result = rag_chain.invoke({"input": user_question, "chat_history": st.session_state.chat_history})
+        st.success("done")
         st.session_state.chat_history.extend([
             HumanMessage(content=user_question),
             AIMessage(content=result['answer'])
