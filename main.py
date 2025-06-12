@@ -13,6 +13,11 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_history_aware_retriever,create_retrieval_chain
 from langchain_core.messages import HumanMessage,AIMessage
+import requests
+from bs4 import BeautifulSoup
+from langchain.document_loaders import TextLoader
+import atexit
+
 
 load_dotenv()
 llm = GoogleGenerativeAI(model="gemini-1.5-flash")
@@ -22,28 +27,82 @@ llm = GoogleGenerativeAI(model="gemini-1.5-flash")
 
 text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200,length_function=len)
 
-def load_documents(folder_path : str) -> List[Document]:
-    documents =[]
+def scrape_and_save(urls: List[str], save_folder: str):
+    os.makedirs(save_folder, exist_ok=True)
+    for i, url in enumerate(urls):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Extract readable text
+            text = soup.get_text(separator='\n', strip=True)
+
+            # Save to .txt file
+            filename = os.path.join(save_folder, f"page_{i+1}.txt")
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(text)
+            print(f"Saved: {filename}")
+
+        except Exception as e:
+            print(f"Error scraping {url}: {e}")
+
+def delete_text_files(folder_path: str):
     for filename in os.listdir(folder_path):
-        file_path=os.path.join(folder_path,filename)
+        if filename.endswith('.txt'):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+            except Exception as e:
+                print(f"Failed to delete {file_path}: {e}")
+
+
+def load_documents(folder_path: str) -> List[Document]:
+    documents = []
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
         if filename.endswith('.pdf'):
-            loader=PyPDFLoader(file_path)
+            loader = PyPDFLoader(file_path)
         elif filename.endswith('.docx'):
             loader = Docx2txtLoader(file_path)
+        elif filename.endswith('.txt'):
+            loader = TextLoader(file_path, encoding='utf-8')
         else:
-            print(f"unsupported file type : {filename}")
+            print(f"Unsupported file type: {filename}")
             continue
         documents.extend(loader.load())
-
     return documents
 
-folder_path= r"C:\Users\VICTUS\OneDrive\Desktop\LLM_docs\docs"
-documents=load_documents(folder_path)
-print(f"loaded {len(documents)} from folder")
+# ====================
+# USER INPUT SECTION
+# ====================
+file_type = input("What is your file type (document/url): ").strip().lower()
 
-splits=text_splitter.split_documents(documents)
-print(f"splitted documents into {len(splits)} chunks")
+# Set destination folder
+folder_path = r"C:\Users\VICTUS\OneDrive\Desktop\LLM_docs\docs"
 
+if file_type == "document":
+    docs = load_documents(folder_path)
+    print(f"Loaded {len(docs)} documents")
+
+elif file_type == "url":
+    urls = input("Enter one or more URLs separated by commas:\n").split(",")
+    urls = [url.strip() for url in urls if url.strip()]
+    scrape_and_save(urls, folder_path)
+    docs = load_documents(folder_path)
+    print(f"Loaded {len(docs)} documents from web")
+
+else:
+    print("Invalid input. Skipping document load.")
+    quit()
+
+# ====================
+# TEXT SPLITTING
+# ====================
+
+splits = text_splitter.split_documents(docs)
+print(f"Split documents into {len(splits)} chunks")
 
 
 #setting up vector store chromadb and embedding
@@ -120,14 +179,16 @@ question_answer_chain = create_stuff_documents_chain(llm,qa_prompt)
 RAG_chain =create_retrieval_chain(history_aware_retriever,question_answer_chain)
 
 chat_history =[]
-question1 ="where is the college"
+question1 = input("Question:")
 answer1 =RAG_chain.invoke({"input":question1,"chat_history":chat_history})['answer']
 
 chat_history.extend([
     HumanMessage(content=question1),
     AIMessage(content=answer1)
 ])
-chat_history.append(HumanMessage(content=question1))
-chat_history.append(AIMessage(content=answer1))
+
 print(question1)
 print(answer1)
+# Register the cleanup to run on program exit
+atexit.register(delete_text_files, folder_path)
+
