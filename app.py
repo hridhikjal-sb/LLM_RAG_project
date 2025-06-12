@@ -17,6 +17,7 @@ import requests
 from bs4 import BeautifulSoup
 from langchain.document_loaders import TextLoader
 import atexit
+import shutil
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +30,14 @@ embedding_function = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 # Folder path for temporary document storage
 folder_path = "docs"
 os.makedirs(folder_path, exist_ok=True)
+
+#Auto delete alll files in docs folder on each run
+for filename in os.listdir(folder_path):
+    file_path = os.path.join(folder_path, filename)
+    try:
+        os.remove(file_path)
+    except Exception as e:
+        print(f"colude not delete {file_path}:{e}")
 
 # Cleanup function to delete .txt files
 def delete_text_files(folder_path: str):
@@ -92,10 +101,13 @@ elif file_type == "url":
         scrape_and_save(urls, folder_path)
         docs = load_documents(folder_path)
         st.success(f"Scraped and loaded {len(docs)} documents.")
+        
 
 # Proceed if documents are loaded
 if 'docs' in locals():
     splits = text_splitter.split_documents(docs)
+    if os.path.exists(".chroma_db"):
+        shutil.rmtree(".chroma_db")
     vectorstore = Chroma.from_documents(
         collection_name='my_collection',
         documents=splits,
