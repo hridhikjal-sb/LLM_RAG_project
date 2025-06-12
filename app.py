@@ -100,7 +100,11 @@ elif file_type == "url":
         urls = [url.strip() for url in urls_input.split(",") if url.strip()]
         scrape_and_save(urls, folder_path)
         docs = load_documents(folder_path)
+        st.session_state.docs = docs  # ✅ persist docs
         st.success(f"Scraped and loaded {len(docs)} documents.")
+        st.success(f"Scraped and loaded {len(docs)} documents.")
+        st.write("Sample doc preview:")#debuS
+        st.write(docs[0].page_content[:500] if docs else "No docs loaded.")
         
 if os.path.exists('.chroma_db'):
     try:
@@ -110,7 +114,9 @@ if os.path.exists('.chroma_db'):
         print(f"Could not delete .chroma_db: {e}")
 
 # Proceed if documents are loaded
-if 'docs' in locals():
+if "docs" in st.session_state:
+    docs = st.session_state.docs
+
     splits = text_splitter.split_documents(docs)
 
     vectorstore = Chroma.from_documents(
@@ -169,3 +175,5 @@ if 'docs' in locals():
         ])
         st.markdown(f"**You:** {user_question}")
         st.markdown(f"**Assistant:** {result['answer']}")
+else:
+    st.warning("No documents found. Did you scrape URLs or upload files?")
