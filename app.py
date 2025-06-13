@@ -85,6 +85,40 @@ st.title("RAG Chatbot with LangChain & Gemini")
 
 file_type = st.radio("Choose input type:", ["document", "url"])
 
+# Check if user switched input type
+if "last_file_type" not in st.session_state:
+    st.session_state.last_file_type = file_type
+
+# If the user changed from doc -> url or url -> doc
+if file_type != st.session_state.last_file_type:
+    # Clear previous docs
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"Could not delete {file_path}: {e}")
+    
+    # Clear chroma db
+    if os.path.exists('.chroma_db'):
+        try:
+            shutil.rmtree('.chroma_db')
+            print("Deleted old .chroma_db")
+        except Exception as e:
+            print(f"Could not delete .chroma_db: {e}")
+
+    # Reset session state
+    for key in ["docs", "chat_history"]:
+        st.session_state.pop(key, None)
+
+    # Reset retriever components (optional if global)
+    for key in ["vectorstore", "retriever", "rag_chain"]:
+        st.session_state.pop(key, None)
+
+    # Update last type
+    st.session_state.last_file_type = file_type
+
+
 if file_type == "document":
     uploaded_files = st.file_uploader("Upload documents (.pdf, .docx, .txt)", type=["pdf", "docx", "txt"], accept_multiple_files=True)
     if uploaded_files:
@@ -92,6 +126,7 @@ if file_type == "document":
             with open(os.path.join(folder_path, file.name), "wb") as f:
                 f.write(file.read())
         docs = load_documents(folder_path)
+        st.session_state.docs = docs
         st.success(f"Loaded {len(docs)} documents.")
 
 elif file_type == "url":
@@ -102,8 +137,6 @@ elif file_type == "url":
         docs = load_documents(folder_path)
         st.session_state.docs = docs  # ✅ persist docs
         st.success(f"Scraped and loaded {len(docs)} documents.")
-        st.success(f"Scraped and loaded {len(docs)} documents.")
-        st.write("Sample doc preview:")#debuS
         st.write(docs[0].page_content[:500] if docs else "No docs loaded.")
         
 if os.path.exists('.chroma_db'):
@@ -126,7 +159,6 @@ if "docs" in st.session_state:
         persist_directory='.chroma_db'
     )
 
-    st.success("chromdb create for url")
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
