@@ -32,6 +32,11 @@ This is a Retrieval-Augmented Generation (RAG) chatbot built with Streamlit, Lan
 
 ├── docs/ # Temporary folder to store uploaded/scraped files
 ├── .chroma_db/ # ChromaDB persistence directory
-├── app.py # Main Streamlit app
+├── app.py # Main Streamlit![Screenshot 2025-06-14 185337](https://github.com/user-attachments/assets/920b4b95-5d9f-407a-9c41-c20c868af7c4)
+
+
+https://github.com/user-attachments/assets/cac906cb-ba73-40a3-85da-142171d840c4
+
+
 ├── README.md # Project documentation
 └── .gitignore # Specifies untracked files like .env to ignore
